@@ -190,7 +190,7 @@ public sealed partial class MainWindow : Window
             ModelChipDot.Fill = _accent;
             var folderName = System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(path)) ?? display;
             ModelValue.Text = DeviceFolder(path) is { } dev ? $"{folderName} · {dev}" : folderName;
-            RunsOnValue.Text = indexed.Model.RunsOnNpu ? "Runs on NPU · QNN" : "Runs on CPU (fallback)";
+            RunsOnValue.Text = indexed.Model.RunsOnNpu ? "Runs on NPU · QNN" : "Runs on CPU (fallback) · QNN";
             RunsOnDot.Fill = indexed.Model.RunsOnNpu ? _good : _bad;
             RunsOnValue.Foreground = RunsOnDot.Fill;
             FooterInfo.Text = $"{System.IO.Path.GetFileName(path)}{(indexed.Model.UsedPrecompiledContext ? " · precompiled NPU context" : "")} · help articles indexed in {indexed.IndexingMs / 1000:F1} s · timing = warm NPU run per message";
