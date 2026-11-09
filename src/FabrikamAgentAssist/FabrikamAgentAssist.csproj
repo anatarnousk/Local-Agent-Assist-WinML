@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <RootNamespace>FabrikamAgentAssist</RootNamespace>
+    <AssemblyName>FabrikamAgentAssist</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <Platforms>ARM64</Platforms>
+    <RuntimeIdentifier>win-arm64</RuntimeIdentifier>
+    <PlatformTarget>ARM64</PlatformTarget>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Engine\*.cs" Link="Engine\%(Filename)%(Extension)" />
+    <Content Include="Assets\kb.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\vocab.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\traffic.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="appsettings.local.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('appsettings.local.json')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
+  </ItemGroup>
+
+</Project>

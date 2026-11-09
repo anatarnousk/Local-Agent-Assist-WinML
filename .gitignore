@@ -1,0 +1,13 @@
+# Build output
+bin/
+obj/
+.vs/
+*.user
+*.binlog
+
+# Model files (too large for git; see models/README.md)
+models/*
+!models/README.md
+
+# Machine-specific settings
+appsettings.local.json

@@ -1,0 +1,297 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="FabrikamAgentAssist.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:FabrikamAgentAssist"
+    Title="Fabrikam Agent Assist">
+
+    <Grid x:Name="Root">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="40" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Padding="16,0,0,0">
+            <TextBlock Text="Fabrikam Agent Assist" VerticalAlignment="Center" FontSize="12" Opacity="0.6" />
+        </Grid>
+
+        <!-- Header -->
+        <Grid Grid.Row="1" Padding="32,4,32,20" ColumnSpacing="14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Border Width="52" Height="52" CornerRadius="12" VerticalAlignment="Center">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#0078D4" Offset="0" />
+                        <GradientStop Color="#8661C5" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <FontIcon Glyph="&#xE8BD;" FontSize="24" Foreground="White" />
+            </Border>
+
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Text="Fabrikam Agent Assist" FontSize="28" FontWeight="SemiBold" />
+                <TextBlock Text="Fabrikam Electronics · real-time reply suggestions for support agents, on this PC" FontSize="15" Opacity="0.65" />
+            </StackPanel>
+
+            <Border Grid.Column="2" CornerRadius="18" Padding="14,8" VerticalAlignment="Center"
+                    Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Ellipse x:Name="ModelChipDot" Width="10" Height="10" Fill="{StaticResource NeutralBrush}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="ModelChipText" Text="No model loaded" FontSize="15" VerticalAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Column="3" CornerRadius="18" Padding="14,8" VerticalAlignment="Center"
+                    Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <FontIcon Glyph="&#xE964;" FontSize="16" Foreground="{StaticResource AccentStrongBrush}" />
+                    <TextBlock x:Name="DeviceChipText" Text="Detecting hardware…" FontSize="15" VerticalAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <Button x:Name="LoadModelButton" Grid.Column="4" Height="44" Padding="18,0" Click="OnLoadModelClick" IsEnabled="False">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <FontIcon Glyph="&#xE838;" FontSize="16" />
+                    <TextBlock Text="Load model…" FontSize="16" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <!-- Search bar + live traffic -->
+        <Grid Grid.Row="2" Padding="32,0,32,20" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="QueryBox" FontSize="22" MinHeight="58" VerticalContentAlignment="Center" Padding="18,12"
+                     PlaceholderText="Type a customer message to get a suggested reply…"
+                     KeyDown="OnQueryKeyDown" IsEnabled="False" />
+            <Button x:Name="SearchButton" Grid.Column="1" MinHeight="58" MinWidth="130" Click="OnSearchClick" IsEnabled="False">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <FontIcon Glyph="&#xE721;" FontSize="18" />
+                    <TextBlock Text="Suggest" FontSize="18" />
+                </StackPanel>
+            </Button>
+            <Button x:Name="TrafficButton" Grid.Column="2" Style="{StaticResource AccentButtonStyle}"
+                    MinHeight="58" MinWidth="220" Click="OnTrafficClick" IsEnabled="False">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <FontIcon x:Name="TrafficIcon" Glyph="&#xE768;" FontSize="18" />
+                    <TextBlock x:Name="TrafficText" Text="Start live chats" FontSize="18" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <!-- Content -->
+        <Grid Grid.Row="3" Padding="32,0,32,24" RowSpacing="16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <InfoBar x:Name="MessageBar" IsOpen="False" IsClosable="True" />
+
+            <!-- Live stats bar -->
+            <Grid Grid.Row="1" ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.15*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border CornerRadius="12" Padding="20,14" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="2">
+                        <TextBlock Style="{StaticResource StatLabel}" Text="Model" />
+                        <TextBlock x:Name="ModelValue" Text="—" FontSize="26" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Ellipse x:Name="RunsOnDot" Width="10" Height="10" Fill="{StaticResource NeutralBrush}" VerticalAlignment="Center" />
+                            <TextBlock x:Name="RunsOnValue" FontSize="13" Text="" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" CornerRadius="12" Padding="20,14" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="2">
+                        <TextBlock Style="{StaticResource StatLabel}" Text="Accuracy (correct suggestions)" />
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Ellipse x:Name="CorrectDot" Width="14" Height="14" Fill="{StaticResource NeutralBrush}" VerticalAlignment="Center" />
+                            <TextBlock x:Name="CorrectValue" Style="{StaticResource StatValue}" Text="—" />
+                        </StackPanel>
+                        <TextBlock x:Name="CorrectSub" FontSize="13" Opacity="0.55" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Border>                <Border Grid.Column="2" CornerRadius="12" Padding="20,14" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="2">
+                        <TextBlock Style="{StaticResource StatLabel}" Text="Latency (median)" />
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Ellipse x:Name="InferenceDot" Width="14" Height="14" Fill="{StaticResource NeutralBrush}" VerticalAlignment="Center" />
+                            <TextBlock x:Name="InferenceValue" Style="{StaticResource StatValue}" Text="—" />
+                        </StackPanel>
+                        <TextBlock x:Name="InferenceSub" FontSize="13" Opacity="0.55" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Border>                <Border Grid.Column="3" CornerRadius="12" Padding="20,14" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="2">
+                        <TextBlock Style="{StaticResource StatLabel}" Text="Capacity (messages per second)" />
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Ellipse x:Name="CapacityDot" Width="14" Height="14" Fill="{StaticResource NeutralBrush}" VerticalAlignment="Center" />
+                            <TextBlock x:Name="CapacityValue" Style="{StaticResource StatValue}" Text="—" />
+                        </StackPanel>
+                        <TextBlock Text=" " FontSize="13" />
+                    </StackPanel>
+                </Border>                <Border Grid.Column="4" CornerRadius="12" Padding="20,14" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1">
+                    <StackPanel Spacing="2">
+                        <TextBlock Style="{StaticResource StatLabel}" Text="Matches the original model" />
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Ellipse x:Name="MatchDot" Width="14" Height="14" Fill="{StaticResource NeutralBrush}" VerticalAlignment="Center" />
+                            <TextBlock x:Name="MatchValue" Style="{StaticResource StatValue}" Text="—" />
+                        </StackPanel>
+                        <TextBlock x:Name="MatchSub" FontSize="13" Opacity="0.55" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Border>            </Grid>
+
+            <!-- Live messages + latency chart side by side -->
+            <Grid Grid.Row="2" ColumnSpacing="24">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Grid RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="INCOMING CUSTOMER MESSAGES" FontSize="13" FontWeight="SemiBold" Opacity="0.6" CharacterSpacing="80" VerticalAlignment="Center" />
+                        <ProgressBar x:Name="TrafficProgress" Grid.Column="1" VerticalAlignment="Center" Maximum="100" Value="0" Opacity="0" />
+                        <TextBlock x:Name="TrafficCount" Grid.Column="2" FontSize="15" Opacity="0.7" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <StackPanel x:Name="EmptyState" Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12">
+                        <FontIcon Glyph="&#xE8F1;" FontSize="48" Opacity="0.35" />
+                        <TextBlock x:Name="EmptyTitle" Text="Load an embedding model to start" FontSize="22"
+                                   HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Opacity="0.8" />
+                        <TextBlock x:Name="EmptySubtitle" Text="Orders · Returns · Billing · Account · Tech support · Warranty" FontSize="15"
+                                   HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Opacity="0.5" />
+                    </StackPanel>
+
+                    <ListView x:Name="Feed" Grid.Row="1" SelectionMode="None" IsItemClickEnabled="False" Visibility="Collapsed"
+                              Padding="0" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="Margin" Value="0,0,0,8" />
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="MinHeight" Value="0" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="local:FeedRow">
+                                <Border CornerRadius="10" Padding="16,10" Background="{x:Bind RowBackground}"
+                                        BorderBrush="{x:Bind RowBorder}" BorderThickness="{x:Bind RowBorderThickness}">
+                                    <Grid ColumnSpacing="14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="32" Height="32" CornerRadius="16" Background="{x:Bind StatusBackground}" VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind StatusGlyph}" FontSize="17" FontWeight="Bold" Foreground="{x:Bind StatusBrush}"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <Border CornerRadius="6" Padding="8,1" Background="#334CC2FF" Visibility="{x:Bind TagVisibility}" VerticalAlignment="Center">
+                                                    <TextBlock Text="YOUR MESSAGE" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentStrongBrush}" />
+                                                </Border>
+                                                <TextBlock Text="{x:Bind Question}" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="Suggested reply:" FontSize="14" Opacity="0.5" />
+                                                <TextBlock Text="{x:Bind Answer}" FontSize="14" Foreground="{x:Bind AnswerBrush}" TextTrimming="CharacterEllipsis" />
+                                                <Border CornerRadius="8" Padding="8,1" Background="{x:Bind PillBackground}" VerticalAlignment="Center">
+                                                    <TextBlock Text="{x:Bind Category}" FontSize="12" FontWeight="SemiBold" Foreground="{x:Bind PillForeground}" />
+                                                </Border>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{x:Bind MsText}" FontSize="16" FontWeight="SemiBold" Opacity="0.85"
+                                                   Foreground="{x:Bind MsBrush}" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </Grid>
+
+                <!-- Latency chart: one bar per message, zoomed 0-20 ms with an on-target zone -->
+                <Grid Grid.Column="1" RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="LATENCY PER MESSAGE" FontSize="13" FontWeight="SemiBold" Opacity="0.6" CharacterSpacing="80" VerticalAlignment="Center" />
+                        <TextBlock x:Name="ChartCaption" Grid.Column="1" FontSize="13" Opacity="0.5" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    </Grid>
+                    <Border Grid.Row="1" CornerRadius="12" Background="#0DFFFFFF" BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1" Padding="20,14,20,18">
+                        <Grid RowSpacing="10">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <!-- Big live readout for the most recent message -->
+                            <StackPanel Orientation="Horizontal" Spacing="18" Margin="38,0,0,0">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="LATEST MESSAGE" FontSize="12" FontWeight="SemiBold" Opacity="0.55" CharacterSpacing="60" />
+                                    <TextBlock x:Name="LatestValue" Text="—" FontSize="46" FontWeight="Bold" />
+                                </StackPanel>
+                                <TextBlock x:Name="LatestSub" FontSize="17" Opacity="0.8" VerticalAlignment="Bottom" Margin="0,0,0,12" />
+                            </StackPanel>
+                            <Canvas x:Name="LatencyCanvas" Grid.Row="1" Margin="38,8,0,0" SizeChanged="OnLatencyCanvasSizeChanged" />
+                        </Grid>
+                    </Border>
+                    <TextBlock x:Name="FooterInfo" Grid.Row="2" FontSize="12" Opacity="0.45" TextTrimming="CharacterEllipsis" />
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <!-- Loading overlay -->
+        <Grid x:Name="Overlay" Grid.RowSpan="4" Background="#F2141414" Visibility="Visible">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="14" Width="520">
+                <Border Width="72" Height="72" CornerRadius="16" HorizontalAlignment="Center">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#0078D4" Offset="0" />
+                            <GradientStop Color="#8661C5" Offset="1" />
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <FontIcon Glyph="&#xE8BD;" FontSize="34" Foreground="White" />
+                </Border>
+                <TextBlock x:Name="OverlayTitle" Text="Fabrikam Agent Assist" FontSize="30" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock x:Name="OverlaySubtitle" Text="Fabrikam Electronics · real-time reply suggestions for support agents, on this PC" FontSize="16" Opacity="0.65" HorizontalAlignment="Center" />
+                <ProgressBar x:Name="OverlayProgress" IsIndeterminate="True" Margin="0,18,0,0" />
+                <TextBlock x:Name="OverlayDetail" Text="Starting…" FontSize="15" Opacity="0.75" HorizontalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>
