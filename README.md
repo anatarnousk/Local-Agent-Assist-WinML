@@ -1,8 +1,8 @@
-# Fabrikam Agent Assist
+# Local Agent Assist (Windows ML)
 
-A Windows ML demo app: **real-time reply suggestions for contact-center agents**, running an embedding model on the Snapdragon NPU.
+Sample app running realtime reply suggestions for support agents at the fictional Fabrikam Electronics store, using an embedding model on the NPU with Windows ML.
 
-Customer chat messages stream in; for each one the app embeds the message on the NPU, finds the best-matching help article from a 90-article knowledge base, and shows whether the suggestion is correct and how long it took. Load the **NPU baseline** model and most suggestions are wrong; load the **auto-optimized** model and they're all right, with lower latency.
+The app is called **Fabrikam Agent Assist** on screen. Customer chat messages stream in; for each one the app embeds the message on the NPU, finds the best-matching help article from a 90-article knowledge base, and shows whether the suggestion is correct and how long it took. Load the **NPU baseline** model and most suggestions are wrong; load the **auto-optimized** model and they're all right, with lower latency.
 
 > *Fabrikam Electronics* is a fictional company. All help articles and customer messages are made up.
 
