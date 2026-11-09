@@ -102,5 +102,9 @@ var session = new InferenceSession(modelPath, options);
 
 ## Credits
 
-- Embedding model: [BAAI/bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) (MIT).
+- Embedding model: [BAAI/bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5) (MIT). `vocab.txt` is the model's tokenizer vocabulary.
 - Built with [Windows ML](https://learn.microsoft.com/windows/ai/new-windows-ml/overview) and the [Windows ML CLI](https://github.com/microsoft/winml-cli).
+
+## License
+
+[MIT](LICENSE)
