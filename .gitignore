@@ -5,6 +5,9 @@ obj/
 *.user
 *.binlog
 
+# Scratch output from optimization\prepare_model.py
+build/
+
 # Model files (too large for git; see models/README.md)
 models/*
 !models/README.md

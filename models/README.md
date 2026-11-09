@@ -17,11 +17,11 @@ models/
 │   │   └── model_npu_*_ctx_*.onnx + _qnn.bin   optional precompiled NPU context (faster load)
 │   └── npu_optimized/
 │       ├── model.onnx                       auto-optimized NPU build: fast and accurate
-│       └── model_compiled_qnn.*.bin         its precompiled NPU context
+│       └── model_static_op17_compiled_qnn.*.bin   its precompiled NPU context
 └── X1/                      Snapdragon X Elite (same three folders)
 ```
 
-Always load **`model.onnx`** and keep it next to its `.data` / `.bin` files.
+Always load **`model.onnx`** and keep it next to its `.data` / `.bin` files. See [How the models were built](../README.md#how-the-models-were-built) for the recipes.
 
 ## Notes
 

@@ -65,16 +65,57 @@ Relative paths are resolved against the first parent folder of the exe where the
 
 The latency chart shows one bar per message on a 0–20 ms scale, with a shaded on-target zone under 11 ms and a big readout for the latest message.
 
-## Results (Snapdragon X2 Elite, Best performance power mode)
+## Results (Snapdragon X2 Elite)
 
-| | NPU baseline | NPU optimized |
-|---|---:|---:|
-| Correct suggestions | 4 / 75 | 75 / 75 |
-| Latency (median) | ~12.5–13 ms | ~8.5–9 ms |
-| Capacity | ~77 msg/s | ~115 msg/s |
-| Matches original model | ~5% | 100% |
+![Fabrikam Agent Assist running the NPU optimized model: 75/75 correct, 4.1 ms median latency](docs/images/app-npu-optimized.png)
 
-For stable numbers: plug in the laptop, set Windows power mode to **Best performance**, and don't run other NPU workloads (e.g. `winml perf` / `winml eval`) at the same time.
+*The app running the NPU optimized model: every suggestion correct, ~4 ms per message, all bars inside the on-target zone.*
+
+| | FP32 (original) | NPU baseline | **NPU optimized** |
+|---|---:|---:|---:|
+| Correct suggestions | 75 / 75 | 4 / 75 | **75 / 75** |
+| Matches the original model | 100% (it *is* the original) | 5% | **100%** |
+| Latency (median) | 41.3 ms | 18.0 ms | **4.2 ms** |
+| Latency (P90) | 44.6 ms | 18.7 ms | **4.4 ms** |
+| Capacity | ~24 msg/s | ~55 msg/s | **~237 msg/s** |
+| Runs on | CPU (QNN fallback) | NPU · QNN | NPU · QNN |
+| Precision | FP32 | w8a16 (uint8 weights, uint16 activations) | w8a16 (int8 per-channel weights, uint16 activations) |
+| Model size on disk | 416 MB | 127 MB | 128 MB |
+| Load + index 90 articles | ~6 s | ~2.2 s | **~0.8 s** |
+
+The optimized model is **~4.3× faster than the NPU baseline** and **~10× faster than FP32 on the CPU**, with the same answers as the original model.
+
+**How this was measured:** the app's own engine, 75 customer messages at 4.5 messages/s, 3 untimed warm-up runs before each timed run, median of the per-message timings, 3 rounds with the model order rotated (spread across rounds: FP32 40.9–42.6 ms, baseline 17.7–18.1 ms, optimized 4.18–4.24 ms). Snapdragon X2 Elite (X2E78100), plugged in, Windows power mode **Best performance**, QNN execution provider 2.2480.53.0, measured 2026-11-09. Absolute numbers vary between machines and sessions; compare the models within the table.
+
+For stable numbers on your machine: plug in, set power mode to **Best performance**, and don't run other NPU workloads (e.g. `winml perf` / `winml eval`) at the same time.
+
+## How the models were built
+
+All three models are [BAAI/bge-base-en-v1.5](https://huggingface.co/BAAI/bge-base-en-v1.5). The two NPU models were built with the [Windows ML CLI](https://github.com/microsoft/winml-cli) (`winml`, v0.4.0), driven by GitHub Copilot with the Windows ML CLI agent skills ([`use-winml-cli`](https://github.com/microsoft/winml-cli/tree/main/skills/use-winml-cli) and [`auto-optimize`](https://github.com/microsoft/winml-cli/tree/main/skills/auto-optimize)). The recipes are in [`optimization/`](optimization).
+
+| Model | How it was built | Why it behaves this way |
+|---|---|---|
+| **FP32 (original)** | ONNX export from [Xenova/bge-base-en-v1.5](https://huggingface.co/Xenova/bge-base-en-v1.5) (`onnx/model.onnx`, opset 11, dynamic input shapes). Not modified. | The app hands it to the QNN execution provider, but with dynamic shapes QNN can't take the graph, so it falls back to the CPU. Accurate but slow; it's also the app's accuracy reference. |
+| **NPU baseline** | `winml build` with default settings: inputs fixed to 1×128, w8a16 quantization (per-tensor uint8 weights, uint16 activations), 10 calibration samples, ORT graph optimization only, compiled for QNN. Config: [`npu_baseline_config.json`](optimization/npu_baseline_config.json). | **Fast but wrong.** The attention mask adds the most negative float (−3.4e38) to padded positions; quantizing that range destroys the precision of real attention scores. The opset-11 GELU (Erf) also falls back to the CPU, splitting the model into 13 NPU partitions. |
+| **NPU optimized** | Found by the **`auto-optimize`** skill, starting from the FP32 model with the goal *lowest NPU latency with cosine similarity ≥ 0.99 vs FP32*. It profiled the baseline, formed hypotheses, and built and measured 14 candidate recipes with `winml build`, `winml perf` and `winml eval`, keeping only changes that passed the accuracy gate and were faster. | See the winning recipe below. |
+
+**Winning recipe (`auto-optimize`):**
+
+1. **Fix input shapes to 1×128 and upgrade opset 11 → 17** ([`prepare_model.py`](optimization/prepare_model.py)), so GELU and LayerNormalization can be fused instead of decomposed. The whole model then compiles into a single NPU partition with no CPU fallback. *(Biggest speed win.)*
+2. **Clamp extreme constants** (`clamp_constant_values`): the −3.4e38 attention-mask value becomes a large-but-finite number, so quantization keeps the resolution of real scores. *(Fixes accuracy.)*
+3. **Graph fusions:** GELU, LayerNorm, MatMul+Add.
+4. **Quantization:** static w8a16 with **int8 symmetric per-channel weights**, uint16 activations, 128 calibration samples.
+5. **Compile ahead of time** to a QNN EP context (`.bin`), so the model loads in under a second.
+
+Config: [`npu_optimized_config.json`](optimization/npu_optimized_config.json). To rebuild it (requires [winml-cli](https://github.com/microsoft/winml-cli) and the `onnx` Python package):
+
+```powershell
+python optimization\prepare_model.py models\X2\fp32\model.onnx build\model_static_op17.onnx
+winml build -c optimization\npu_optimized_config.json -m build\model_static_op17.onnx -o models\X2\npu_optimized `
+  --ep qnn --device npu --precision w8a16 --compile --no-analyze --rebuild
+```
+
+The compiled `.bin` is specific to the NPU it was built on (an X2 Elite build won't load on an X Elite and vice versa), so rebuild on your target device.
 
 ## How it works
 
@@ -88,6 +129,8 @@ For stable numbers: plug in the laptop, set Windows power mode to **Best perform
 | `src/FabrikamAgentAssist/Assets/traffic.json` | 75 labeled customer messages |
 | `src/FabrikamAgentAssist/Assets/vocab.txt` | Tokenizer vocabulary from bge-base-en-v1.5 |
 | `tools/make-icon.ps1` | Regenerates `Assets/AppIcon.ico` |
+| `optimization/` | `winml build` configs for the NPU baseline and optimized models, plus `prepare_model.py` |
+| `docs/images/` | Screenshots |
 
 Windows ML setup, simplified:
 

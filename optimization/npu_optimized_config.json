@@ -1,0 +1,33 @@
+{
+  "export": null,
+  "optim": {
+    "ort_graph_optimization": true,
+    "clamp_constant_values": true,
+    "gelu_fusion": true,
+    "layer_norm_fusion": true,
+    "matmul_add_fusion": true
+  },
+  "quant": {
+    "mode": "static",
+    "samples": 128,
+    "calibration_method": "minmax",
+    "weight_type": "int8",
+    "activation_type": "uint16",
+    "per_channel": true,
+    "symmetric": false,
+    "weight_symmetric": true,
+    "task": "feature-extraction",
+    "model_id": "BAAI/bge-base-en-v1.5"
+  },
+  "compile": {
+    "execution_provider": "qnn",
+    "provider_options": {
+      "device_type": "NPU"
+    },
+    "enable_ep_context": true,
+    "embed_context": false,
+    "compiler": "ort",
+    "device": "npu",
+    "validate": true
+  }
+}
