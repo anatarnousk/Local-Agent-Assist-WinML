@@ -6,9 +6,13 @@ The app is called **Fabrikam Agent Assist** on screen. Customer chat messages st
 
 > *Fabrikam Electronics* is a fictional company. All help articles and customer messages are made up.
 
+![Fabrikam Agent Assist running the NPU optimized model: 75/75 correct, 4.1 ms median latency](docs/images/app-npu-optimized.png)
+
+*The app running the NPU optimized model: every suggestion correct, ~4 ms per message, all bars inside the on-target zone.*
+
 ## Why an embedding model (not an LLM)?
 
-Agent assist needs a suggestion for **every message, for every agent, within milliseconds**, privately and at low cost. That's a retrieval job: a ~110M-parameter embedding model on the NPU answers in about 10 ms.
+Agent assist needs a suggestion for **every message, for every agent, within milliseconds**, privately and at low cost. That's a retrieval job: a ~110M-parameter embedding model on the NPU answers in about 4 ms.
 
 ## Requirements
 
@@ -66,10 +70,6 @@ Relative paths are resolved against the first parent folder of the exe where the
 The latency chart shows one bar per message on a 0–20 ms scale, with a shaded on-target zone under 11 ms and a big readout for the latest message.
 
 ## Results (Snapdragon X2 Elite)
-
-![Fabrikam Agent Assist running the NPU optimized model: 75/75 correct, 4.1 ms median latency](docs/images/app-npu-optimized.png)
-
-*The app running the NPU optimized model: every suggestion correct, ~4 ms per message, all bars inside the on-target zone.*
 
 | | FP32 (original) | NPU baseline | **NPU optimized** |
 |---|---:|---:|---:|
