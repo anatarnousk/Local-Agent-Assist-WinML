@@ -30,6 +30,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Windows ML comes in via the Windows App SDK; it's also available as the standalone Microsoft.Windows.AI.MachineLearning package. -->
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
   </ItemGroup>

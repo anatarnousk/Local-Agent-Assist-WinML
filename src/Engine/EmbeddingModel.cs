@@ -1,5 +1,9 @@
 using System.Diagnostics;
+// ── WINDOWS ML STEP 1 · Reference Windows ML ────────────────────────────────────────────────────
+// One NuGet package, Microsoft.Windows.AI.MachineLearning, gives you the Windows ML APIs
+// plus the ONNX Runtime APIs you already know.
 using Microsoft.ML.OnnxRuntime;
+using Microsoft.Windows.AI.MachineLearning;
 
 namespace FabrikamAgentAssist.Engine;
 
@@ -11,6 +15,19 @@ public enum ComputeTarget { Npu, Cpu }
 /// </summary>
 public sealed class EmbeddingModel : IDisposable
 {
+    // ── WINDOWS ML STEP 2 · Acquire and register execution providers for this device ──────────────
+    /// <summary>Downloads (if needed) and registers Windows ML execution providers, e.g. QNN for the NPU. Call once at startup.</summary>
+    public static async Task InitializeWindowsMLAsync()
+    {
+        // The catalog knows which certified execution providers (EPs) match this PC's hardware.
+        // On a Snapdragon PC that's the Qualcomm QNN EP for the Hexagon NPU.
+        var catalog = ExecutionProviderCatalog.GetDefault();
+
+        // Downloads any missing EPs via Windows Update (first run only), then registers them with ONNX Runtime.
+        // The app never ships the QNN EP itself.
+        await catalog.EnsureAndRegisterCertifiedAsync();
+    }
+
     public const int SeqLen = 128;
     public const int Dim = 768;
 
@@ -66,27 +83,28 @@ public sealed class EmbeddingModel : IDisposable
 
         if (target == ComputeTarget.Npu)
         {
-            var devices = env.GetEpDevices()
-                .Where(d => d.EpName == "QNNExecutionProvider" && d.HardwareDevice.Type == OrtHardwareDeviceType.NPU)
-                .ToList();
-            if (devices.Count == 0)
-                throw new InvalidOperationException("The Qualcomm QNN execution provider (NPU) is not available on this PC.");
-
-            var epOptions = new Dictionary<string, string> { ["htp_performance_mode"] = "burst" };
-            options.AppendExecutionProvider(env, new[] { devices[0] }, epOptions);
-            epName = devices[0].EpName;
+            // ── WINDOWS ML STEP 3 · Set the hardware target ───────────────────────────────────────
+            // Describe the outcome you want: PREFER_NPU picks the NPU's EP (QNN on Snapdragon) when one is
+            // registered, and falls back to the CPU otherwise. You can also name a specific EP and device
+            // instead: env.GetEpDevices() + options.AppendExecutionProvider(...) with EP-specific options.
+            options.SetEpSelectionPolicy(ExecutionProviderDevicePolicy.PREFER_NPU);
+            epName = env.GetEpDevices().FirstOrDefault(d => d.HardwareDevice.Type == OrtHardwareDeviceType.NPU)?.EpName
+                     ?? "CPUExecutionProvider";
 
             // winml-cli caches a precompiled NPU context next to a QDQ model; prefer it to skip on-device compilation.
             var ctx = FindPrecompiledContext(modelPath);
             if (ctx is not null) { loadPath = ctx; usedCtx = true; }
         }
 
+        // ── WINDOWS ML STEP 4 · Load the model and create a session ─────────────────────────────────
+        // Standard ONNX Runtime API. For the NPU models this is fast (<1 s) because winml-cli already
+        // compiled them for the NPU ("EPContext"), so nothing is compiled on the device at load time.
         var sw = Stopwatch.StartNew();
         var session = new InferenceSession(loadPath, options);
         sw.Stop();
 
         // QNN only accelerates quantized (QDQ) or precompiled (EPContext) graphs; anything else silently falls back to CPU.
-        bool onNpu = target == ComputeTarget.Npu && ContainsAny(loadPath, "EPContext", "QuantizeLinear");
+        bool onNpu = target == ComputeTarget.Npu && epName != "CPUExecutionProvider" && ContainsAny(loadPath, "EPContext", "QuantizeLinear");
 
         return new EmbeddingModel(session, tokenizer, modelPath, loadPath, usedCtx, target, epName, sw.Elapsed.TotalMilliseconds) { RunsOnNpu = onNpu };
     }
@@ -127,6 +145,9 @@ public sealed class EmbeddingModel : IDisposable
     {
         lock (_lock)
         {
+            // ── WINDOWS ML STEP 5 · Prepare the input ───────────────────────────────────────────────
+            // Turn the customer's message into token IDs, padded to the model's fixed 1×128 shape.
+            // The three arrays are pre-wrapped as ONNX tensors (OrtValues), so no copies per message.
             _tokenizer.Encode(text, SeqLen, _inputIds, _attentionMask, _tokenTypeIds);
 
             for (int i = 0; i < warmupRuns; i++)
@@ -134,12 +155,17 @@ public sealed class EmbeddingModel : IDisposable
                 using var _ = _session.Run(_runOptions, _inputNames, _inputs, _outputNames);
             }
 
+            // ── WINDOWS ML STEP 6 · Run inference ─────────────────────────────────────────────────
+            // One call; ONNX Runtime executes it on whichever device step 3 selected (the NPU here).
             var sw = Stopwatch.StartNew();
             using var outputs = _session.Run(_runOptions, _inputNames, _inputs, _outputNames);
             sw.Stop();
             inferenceMs = sw.Elapsed.TotalMilliseconds;
             _timings.Add(inferenceMs);
 
+            // ── WINDOWS ML STEP 7 · Use the output ────────────────────────────────────────────────
+            // The model returns a 768-number vector per token; the first one ([CLS]) represents the
+            // whole message. Normalized, it can be compared with each help article's vector (cosine).
             var hidden = outputs[0].GetTensorDataAsSpan<float>();
             var vec = hidden[..Dim].ToArray();
             Normalize(vec);

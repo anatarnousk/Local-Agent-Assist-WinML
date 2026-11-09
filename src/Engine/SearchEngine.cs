@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Text.Json;
-using Microsoft.Windows.AI.MachineLearning;
 
 namespace FabrikamAgentAssist.Engine;
 
@@ -53,13 +52,6 @@ public sealed class SearchEngine : IDisposable
         Articles = JsonSerializer.Deserialize<List<Article>>(File.ReadAllText(kbPath),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
         Tokenizer = new WordPieceTokenizer(vocabPath);
-    }
-
-    /// <summary>Downloads (if needed) and registers Windows ML execution providers, e.g. QNN for the NPU.</summary>
-    public static async Task InitializeWindowsMLAsync()
-    {
-        var catalog = ExecutionProviderCatalog.GetDefault();
-        await catalog.EnsureAndRegisterCertifiedAsync();
     }
 
     public async Task LoadReferenceAsync(string fp32Path, IProgress<double>? progress = null)

@@ -94,7 +94,7 @@ public sealed partial class MainWindow : Window
             _traffic = TrafficItem.Load(System.IO.Path.Combine(assets, "traffic.json"));
 
             OverlayDetail.Text = "Preparing Windows ML…";
-            await SearchEngine.InitializeWindowsMLAsync();
+            await EmbeddingModel.InitializeWindowsMLAsync();
 
             if (File.Exists(_settings.ReferenceModel))
             {
@@ -190,7 +190,9 @@ public sealed partial class MainWindow : Window
             ModelChipDot.Fill = _accent;
             var folderName = System.IO.Path.GetFileName(System.IO.Path.GetDirectoryName(path)) ?? display;
             ModelValue.Text = DeviceFolder(path) is { } dev ? $"{folderName} · {dev}" : folderName;
-            RunsOnValue.Text = indexed.Model.RunsOnNpu ? "Runs on NPU · QNN" : "Runs on CPU (fallback) · QNN";
+            var ep = indexed.Model.EpName.Replace("ExecutionProvider", "");
+            RunsOnValue.Text = indexed.Model.RunsOnNpu ? $"Runs on NPU · {ep}"
+                : ep == "CPU" ? "Runs on CPU (no NPU execution provider)" : $"Runs on CPU (fallback) · {ep}";
             RunsOnDot.Fill = indexed.Model.RunsOnNpu ? _good : _bad;
             RunsOnValue.Foreground = RunsOnDot.Fill;
             FooterInfo.Text = $"{System.IO.Path.GetFileName(path)}{(indexed.Model.UsedPrecompiledContext ? " · precompiled NPU context" : "")} · help articles indexed in {indexed.IndexingMs / 1000:F1} s · timing = warm NPU run per message";

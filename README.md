@@ -73,7 +73,8 @@ The latency chart shows one bar per message on a 0–20 ms scale, with a shaded 
 
 | | FP32 (original) | NPU baseline | **NPU optimized** |
 |---|---:|---:|---:|
-| Correct suggestions | 75 / 75 | 4 / 75 | **75 / 75** |
+| Accuracy (correct suggestions) | 100% (75/75) | **5% (4/75)** | **100% (75/75)** |
+| Accuracy (embedding similarity to FP32)¹ | 1.000 (reference) | **0.477** | **0.999** |
 | Matches the original model | 100% (it *is* the original) | 5% | **100%** |
 | Latency (median) | 41.3 ms | 18.0 ms | **4.2 ms** |
 | Latency (P90) | 44.6 ms | 18.7 ms | **4.4 ms** |
@@ -86,6 +87,8 @@ The latency chart shows one bar per message on a 0–20 ms scale, with a shaded 
 The optimized model is **~4.3× faster than the NPU baseline** and **~10× faster than FP32 on the CPU**, with the same answers as the original model.
 
 **How this was measured:** the app's own engine, 75 customer messages at 4.5 messages/s, 3 untimed warm-up runs before each timed run, median of the per-message timings, 3 rounds with the model order rotated (spread across rounds: FP32 40.9–42.6 ms, baseline 17.7–18.1 ms, optimized 4.18–4.24 ms). Snapdragon X2 Elite (X2E78100), plugged in, Windows power mode **Best performance**, QNN execution provider 2.2480.53.0, measured 2026-11-09. Absolute numbers vary between machines and sessions; compare the models within the table.
+
+¹ Measured separately with `winml eval --mode compare` against the FP32 model on the CPU: mean cosine similarity of the model's output (every token) over 380 real text inputs; 1.0 = identical. A model is considered accurate at ≥ 0.99.
 
 For stable numbers on your machine: plug in, set power mode to **Best performance**, and don't run other NPU workloads (e.g. `winml perf` / `winml eval`) at the same time.
 
@@ -122,7 +125,7 @@ The compiled `.bin` is specific to the NPU it was built on (an X2 Elite build wo
 | Path | What |
 |---|---|
 | `src/Engine/WordPieceTokenizer.cs` | BERT uncased WordPiece tokenizer (output verified identical to Hugging Face `tokenizers`) |
-| `src/Engine/EmbeddingModel.cs` | ONNX Runtime session on the QNN NPU via Windows ML; fixed 1×128 input; CLS pooling + L2 normalization |
+| `src/Engine/EmbeddingModel.cs` | **All the Windows ML code, marked `WINDOWS ML STEP 1–7`:** register execution providers, `PREFER_NPU` device policy, ONNX Runtime session, fixed 1×128 input, CLS pooling + L2 normalization |
 | `src/Engine/SearchEngine.cs` | Knowledge base, FP32 CPU reference, cosine ranking |
 | `src/FabrikamAgentAssist/` | WinUI 3 app (unpackaged, dark theme) |
 | `src/FabrikamAgentAssist/Assets/kb.json` | 90 help articles (Orders, Returns, Billing, Account, Tech support, Warranty) |
@@ -135,13 +138,16 @@ The compiled `.bin` is specific to the NPU it was built on (an X2 Elite build wo
 Windows ML setup, simplified:
 
 ```csharp
+// Download (if needed) and register the certified execution providers for this PC, e.g. QNN for the Snapdragon NPU.
 await ExecutionProviderCatalog.GetDefault().EnsureAndRegisterCertifiedAsync();
-var npu = OrtEnv.Instance().GetEpDevices()
-    .First(d => d.EpName == "QNNExecutionProvider" && d.HardwareDevice.Type == OrtHardwareDeviceType.NPU);
+
+// Let Windows ML pick the execution provider and device: prefer the NPU, fall back to the CPU.
 var options = new SessionOptions();
-options.AppendExecutionProvider(OrtEnv.Instance(), new[] { npu }, new Dictionary<string, string> { ["htp_performance_mode"] = "burst" });
+options.SetEpSelectionPolicy(ExecutionProviderDevicePolicy.PREFER_NPU);
 var session = new InferenceSession(modelPath, options);
 ```
+
+The app uses a [device policy](https://learn.microsoft.com/windows/ai/new-windows-ml/select-execution-providers#using-device-policies-for-execution-provider-selection) instead of explicitly choosing `QNNExecutionProvider` with `GetEpDevices()` / `AppendExecutionProvider`. On this device `PREFER_NPU` selects QNN on the Hexagon NPU, and in our tests it ran the optimized model faster (~3.5 ms) than explicit selection with `htp_performance_mode=burst` (~4.2 ms).
 
 ## Credits
 
