@@ -47,11 +47,12 @@ public sealed class EmbeddingModel : IDisposable
     public string LoadedPath { get; }
     public bool UsedPrecompiledContext { get; }
     public ComputeTarget Target { get; }
-    public string EpName { get; }
+    /// <summary>Execution provider that did the work, from the ORT profile (CPUExecutionProvider if none).</summary>
+    public string EpName { get; private set; } = "CPUExecutionProvider";
     public double SessionCreateMs { get; }
 
     private EmbeddingModel(InferenceSession session, WordPieceTokenizer tokenizer, string requestedPath,
-        string loadedPath, bool usedCtx, ComputeTarget target, string epName, double createMs)
+        string loadedPath, bool usedCtx, ComputeTarget target, double createMs)
     {
         _session = session;
         _tokenizer = tokenizer;
@@ -59,7 +60,6 @@ public sealed class EmbeddingModel : IDisposable
         LoadedPath = loadedPath;
         UsedPrecompiledContext = usedCtx;
         Target = target;
-        EpName = epName;
         SessionCreateMs = createMs;
 
         var shape = new long[] { 1, SeqLen };
@@ -76,57 +76,104 @@ public sealed class EmbeddingModel : IDisposable
     public static EmbeddingModel Load(string modelPath, ComputeTarget target, WordPieceTokenizer tokenizer)
     {
         var env = OrtEnv.Instance();
-        var options = new SessionOptions();
-        string epName = "CPUExecutionProvider";
+        using var options = new SessionOptions();
         string loadPath = modelPath;
         bool usedCtx = false;
+        OrtEpDevice? qnnNpu = null;
 
         if (target == ComputeTarget.Npu)
         {
             // ── WINDOWS ML STEP 3 · Set the hardware target ───────────────────────────────────────
             // Describe the outcome you want: PREFER_NPU picks the NPU's EP (QNN on Snapdragon) when one is
-            // registered, and falls back to the CPU otherwise. You can also name a specific EP and device
-            // instead: env.GetEpDevices() + options.AppendExecutionProvider(...) with EP-specific options.
+            // registered, and falls back to the CPU otherwise. For models built for one specific EP, you can
+            // name it instead: env.GetEpDevices() + options.AppendExecutionProvider(...) with EP-specific options.
             options.SetEpSelectionPolicy(ExecutionProviderDevicePolicy.PREFER_NPU);
-            epName = env.GetEpDevices().FirstOrDefault(d => d.HardwareDevice.Type == OrtHardwareDeviceType.NPU)?.EpName
-                     ?? "CPUExecutionProvider";
 
-            // winml-cli caches a precompiled NPU context next to a QDQ model; prefer it to skip on-device compilation.
-            var ctx = FindPrecompiledContext(modelPath);
-            if (ctx is not null) { loadPath = ctx; usedCtx = true; }
+            // winml-cli caches a precompiled QNN context next to a QDQ model. Only use it when a QNN NPU is
+            // present; otherwise load the portable model so the CPU fallback still works.
+            qnnNpu = env.GetEpDevices().FirstOrDefault(d =>
+                d.EpName == "QNNExecutionProvider" && d.HardwareDevice.Type == OrtHardwareDeviceType.NPU);
+            if (qnnNpu is not null)
+            {
+                var ctx = FindPrecompiledContext(modelPath);
+                if (ctx is not null) { loadPath = ctx; usedCtx = true; }
+            }
         }
+
+        // Profile the first run so we can report where the model actually ran (see DetectPlacement).
+        var profilePrefix = Path.Combine(Path.GetTempPath(), $"embedding_profile_{Guid.NewGuid():N}");
+        options.EnableProfiling = true;
+        options.ProfileOutputPathPrefix = profilePrefix;
 
         // ── WINDOWS ML STEP 4 · Load the model and create a session ─────────────────────────────────
         // Standard ONNX Runtime API. For the NPU models this is fast (<1 s) because winml-cli already
         // compiled them for the NPU ("EPContext"), so nothing is compiled on the device at load time.
         var sw = Stopwatch.StartNew();
-        var session = new InferenceSession(loadPath, options);
+        InferenceSession session;
+        try
+        {
+            session = new InferenceSession(loadPath, options);
+        }
+        catch (OnnxRuntimeException ex) when (target == ComputeTarget.Npu && qnnNpu is null)
+        {
+            throw new InvalidOperationException(
+                "This model couldn't be loaded on this PC. If it was compiled for the Qualcomm NPU (QNN), " +
+                $"it needs a Snapdragon device with the QNN execution provider. ({ex.Message})", ex);
+        }
         sw.Stop();
 
-        // QNN only accelerates quantized (QDQ) or precompiled (EPContext) graphs; anything else silently falls back to CPU.
-        bool onNpu = target == ComputeTarget.Npu && epName != "CPUExecutionProvider" && ContainsAny(loadPath, "EPContext", "QuantizeLinear");
-
-        return new EmbeddingModel(session, tokenizer, modelPath, loadPath, usedCtx, target, epName, sw.Elapsed.TotalMilliseconds) { RunsOnNpu = onNpu };
+        var model = new EmbeddingModel(session, tokenizer, modelPath, loadPath, usedCtx, target, sw.Elapsed.TotalMilliseconds);
+        model.DetectPlacement();
+        return model;
     }
 
-    public bool RunsOnNpu { get; private init; }
+    /// <summary>True when most of the model's compute ran on a non-CPU execution provider (the NPU).</summary>
+    public bool RunsOnNpu { get; private set; }
 
-    private static bool ContainsAny(string path, params string[] markers)
+    /// <summary>
+    /// Runs one profiled inference and reads the ONNX Runtime profile to see which execution provider
+    /// executed the model's nodes, instead of guessing from the model file. Profiling stops afterwards.
+    /// </summary>
+    private void DetectPlacement()
     {
-        var patterns = markers.Select(System.Text.Encoding.ASCII.GetBytes).ToArray();
-        int overlap = patterns.Max(p => p.Length) - 1;
-        var buffer = new byte[4 * 1024 * 1024 + overlap];
-        using var fs = File.OpenRead(path);
-        int carried = 0, read;
-        while ((read = fs.Read(buffer, carried, buffer.Length - carried)) > 0)
+        string? profilePath = null;
+        try
         {
-            var span = buffer.AsSpan(0, carried + read);
-            foreach (var p in patterns)
-                if (span.IndexOf(p) >= 0) return true;
-            carried = Math.Min(overlap, span.Length);
-            span[^carried..].CopyTo(buffer);
+            lock (_lock)
+            {
+                _tokenizer.Encode("hello", SeqLen, _inputIds, _attentionMask, _tokenTypeIds);
+                using (var _ = _session.Run(_runOptions, _inputNames, _inputs, _outputNames)) { }
+                profilePath = _session.EndProfiling();
+            }
+
+            // Sum kernel time per execution provider from the profile's "Node" events.
+            var timeByEp = new Dictionary<string, long>();
+            using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(profilePath));
+            foreach (var e in doc.RootElement.EnumerateArray())
+            {
+                if (!e.TryGetProperty("cat", out var cat) || cat.GetString() != "Node") continue;
+                if (!e.TryGetProperty("args", out var args) || !args.TryGetProperty("provider", out var prov)) continue;
+                var ep = prov.GetString() ?? "";
+                long dur = e.TryGetProperty("dur", out var d) ? d.GetInt64() : 0;
+                timeByEp[ep] = timeByEp.GetValueOrDefault(ep) + dur;
+            }
+
+            var accel = timeByEp.Where(kv => kv.Key != "CPUExecutionProvider").OrderByDescending(kv => kv.Value).FirstOrDefault();
+            long total = timeByEp.Values.Sum();
+            EpName = accel.Key ?? "CPUExecutionProvider";
+            // A model can hand a few nodes to the NPU and still run almost entirely on the CPU;
+            // count it as "on the NPU" only when the NPU EP did most of the work.
+            RunsOnNpu = Target == ComputeTarget.Npu && accel.Key is not null && total > 0 && accel.Value * 2 >= total;
         }
-        return false;
+        catch (Exception)
+        {
+            EpName = "CPUExecutionProvider";
+            RunsOnNpu = false;
+        }
+        finally
+        {
+            if (profilePath is not null) { try { File.Delete(profilePath); } catch (IOException) { } }
+        }
     }
 
     private static string? FindPrecompiledContext(string modelPath)
