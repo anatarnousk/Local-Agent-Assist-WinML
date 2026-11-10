@@ -221,16 +221,27 @@
                                                 </Border>
                                                 <TextBlock Text="{x:Bind Question}" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                             </StackPanel>
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock Text="Suggested reply:" FontSize="14" Opacity="0.5" />
-                                                <TextBlock Text="{x:Bind Answer}" FontSize="14" Foreground="{x:Bind AnswerBrush}" TextTrimming="CharacterEllipsis" />
-                                                <Border CornerRadius="8" Padding="8,1" Background="{x:Bind PillBackground}" VerticalAlignment="Center">
-                                                    <TextBlock Text="{x:Bind Category}" FontSize="12" FontWeight="SemiBold" Foreground="{x:Bind PillForeground}" />
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <!-- Suggested reply, shown as a chat bubble the rep could send -->
+                                                <FontIcon Glyph="&#xE97A;" FontSize="13" Opacity="0.45" VerticalAlignment="Center" />
+                                                <Border Grid.Column="1" CornerRadius="4,12,12,12" Padding="10,4" Background="#14FFFFFF" HorizontalAlignment="Left"
+                                                        ToolTipService.ToolTip="{x:Bind Source}">
+                                                    <TextBlock Text="{x:Bind Reply}" FontSize="14" Foreground="{x:Bind AnswerBrush}" TextTrimming="CharacterEllipsis" />
                                                 </Border>
-                                            </StackPanel>
+                                            </Grid>
                                         </StackPanel>
-                                        <TextBlock Grid.Column="2" Text="{x:Bind MsText}" FontSize="16" FontWeight="SemiBold" Opacity="0.85"
-                                                   Foreground="{x:Bind MsBrush}" VerticalAlignment="Center" />
+                                        <!-- Latency + source help-article category (hover the reply for the article title) -->
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Spacing="6">
+                                            <TextBlock Text="{x:Bind MsText}" FontSize="16" FontWeight="SemiBold" Opacity="0.85"
+                                                       Foreground="{x:Bind MsBrush}" HorizontalAlignment="Right" />
+                                            <Border CornerRadius="8" Padding="8,1" Background="{x:Bind PillBackground}" HorizontalAlignment="Right">
+                                                <TextBlock Text="{x:Bind Category}" FontSize="12" FontWeight="SemiBold" Foreground="{x:Bind PillForeground}" />
+                                            </Border>
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
                             </DataTemplate>

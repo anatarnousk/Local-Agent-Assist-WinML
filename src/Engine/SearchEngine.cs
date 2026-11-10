@@ -3,8 +3,9 @@ using System.Text.Json;
 
 namespace FabrikamAgentAssist.Engine;
 
-public sealed record Article(string Id, string Title, string Category, string Body)
+public sealed record Article(string Id, string Title, string Category, string Body, string? Reply = null)
 {
+    // Only the title + body are embedded; the reply is display text, so it doesn't affect matching.
     public string EmbeddingText => $"{Title}. {Body}";
 }
 

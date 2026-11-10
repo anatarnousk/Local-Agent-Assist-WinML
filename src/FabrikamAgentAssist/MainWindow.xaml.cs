@@ -17,7 +17,8 @@ namespace FabrikamAgentAssist;
 public sealed class FeedRow
 {
     public required string Question { get; init; }
-    public required string Answer { get; init; }
+    public required string Reply { get; init; }
+    public required string Source { get; init; }
     public required string Category { get; init; }
     public required string MsText { get; init; }
     public required string StatusGlyph { get; init; }
@@ -336,7 +337,8 @@ public sealed partial class MainWindow : Window
         _rows.Insert(0, new FeedRow
         {
             Question = question,
-            Answer = top.Title,
+            Reply = top.Reply ?? top.Title,
+            Source = $"Help article: {top.Title}",
             Category = top.Category,
             MsText = $"{ms:F1} ms",
             StatusGlyph = good ? "✓" : "✕",

@@ -2,13 +2,13 @@
 
 Sample app running realtime reply suggestions for support agents at the fictional Fabrikam Electronics store, using an embedding model on the NPU with Windows ML.
 
-The app is called **Fabrikam Agent Assist** on screen. Customer chat messages stream in; for each one the app embeds the message on the NPU, finds the best-matching help article from a 90-article knowledge base, and shows whether the suggestion is correct and how long it took. Load the **NPU baseline** model and most suggestions are wrong; load the **auto-optimized** model and they're all right, with lower latency.
+The app is called **Fabrikam Agent Assist** on screen. Customer chat messages stream in; for each one the app embeds the message on the NPU, finds the best-matching help article from a 90-article knowledge base, and shows that article's ready-to-send reply for the support rep, whether it's correct, and how long it took. Load the **NPU baseline** model and most suggestions are wrong; load the **auto-optimized** model and they're all right, with lower latency.
 
 > *Fabrikam Electronics* is a fictional company. All help articles and customer messages are made up.
 
-![Fabrikam Agent Assist running the NPU optimized model: 75/75 correct, 4.1 ms median latency](docs/images/app-npu-optimized.png)
+![Fabrikam Agent Assist running the NPU optimized model: 75/75 correct, 3.4 ms median latency](docs/images/app-npu-optimized.png)
 
-*The app running the NPU optimized model: every suggestion correct, ~4 ms per message, all bars inside the on-target zone.*
+*The app running the NPU optimized model: every suggested reply correct, ~3.4 ms per message, all bars inside the on-target zone.*
 
 ## Why an embedding model (not an LLM)?
 
@@ -128,7 +128,7 @@ The compiled `.bin` is specific to the NPU it was built on (an X2 Elite build wo
 | `src/Engine/EmbeddingModel.cs` | **All the Windows ML code, marked `WINDOWS ML STEP 1–7`:** register execution providers, `PREFER_NPU` device policy, ONNX Runtime session, fixed 1×128 input, CLS pooling + L2 normalization |
 | `src/Engine/SearchEngine.cs` | Knowledge base, FP32 CPU reference, cosine ranking |
 | `src/FabrikamAgentAssist/` | WinUI 3 app (unpackaged, dark theme) |
-| `src/FabrikamAgentAssist/Assets/kb.json` | 90 help articles (Orders, Returns, Billing, Account, Tech support, Warranty) |
+| `src/FabrikamAgentAssist/Assets/kb.json` | 90 help articles (Orders, Returns, Billing, Account, Tech support, Warranty), each with a short ready-to-send `reply`. Only the title + body are embedded for matching; the reply is what the app shows |
 | `src/FabrikamAgentAssist/Assets/traffic.json` | 75 labeled customer messages |
 | `src/FabrikamAgentAssist/Assets/vocab.txt` | Tokenizer vocabulary from bge-base-en-v1.5 |
 | `tools/make-icon.ps1` | Regenerates `Assets/AppIcon.ico` |
