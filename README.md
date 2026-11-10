@@ -53,7 +53,7 @@ FabrikamAgentAssist.exe --model <path> [--model <path> ...] [--traffic] [--query
 |---|---|---|
 | `ModelsFolder` | `models` | Folder the **Load model…** dialog opens in |
 | `ReferenceModel` | `models\X2\fp32\model.onnx` | FP32 model used for "Matches the original model" |
-| `TrafficQuestionsPerSecond` | `4.5` | Pace of the live-chat stream (75 messages ≈ 17 s) |
+| `TrafficQuestionsPerSecond` | `4.5` | Pace of the live-chat stream (50 messages ≈ 11 s) |
 | `WarmupRunsPerQuestion` | `3` | Untimed NPU runs before each timed run, so idle gaps between paced messages don't skew latency |
 
 Relative paths are resolved against the first parent folder of the exe where they exist (e.g. the repo root). For machine-specific paths, create `src\FabrikamAgentAssist\appsettings.local.json` (same format, git-ignored); it's used instead of `appsettings.json` when present.
@@ -73,7 +73,7 @@ The latency chart shows one bar per message on a 0–20 ms scale, with a shaded 
 
 | | FP32 (original) | NPU baseline | **NPU optimized** |
 |---|---:|---:|---:|
-| Accuracy (correct suggestions) | 100% (75/75) | **5% (4/75)** | **100% (75/75)** |
+| Accuracy (correct suggestions) | 100% (50/50) | **4% (2/50)** | **100% (50/50)** |
 | Accuracy (embedding similarity to FP32)¹ | 1.000 (reference) | **0.477** | **0.999** |
 | Matches the original model | 100% (it *is* the original) | 5% | **100%** |
 | Latency (median) | 41.3 ms | 18.0 ms | **4.2 ms** |
@@ -86,7 +86,7 @@ The latency chart shows one bar per message on a 0–20 ms scale, with a shaded 
 
 The optimized model is **~4.3× faster than the NPU baseline** and **~10× faster than FP32 on the CPU**, with the same answers as the original model.
 
-**How this was measured:** the app's own engine, 75 customer messages at 4.5 messages/s, 3 untimed warm-up runs before each timed run, median of the per-message timings, 3 rounds with the model order rotated (spread across rounds: FP32 40.9–42.6 ms, baseline 17.7–18.1 ms, optimized 4.18–4.24 ms). Snapdragon X2 Elite (X2E78100), plugged in, Windows power mode **Best performance**, QNN execution provider 2.2480.53.0, measured 2026-11-09. Absolute numbers vary between machines and sessions; compare the models within the table.
+**How this was measured:** accuracy is from the current 50-message set; latency and capacity are from an earlier 3-round run of the app's engine with 75 customer messages at 4.5 messages/s, 3 untimed warm-up runs before each timed run, median of the per-message timings, 3 rounds with the model order rotated (spread across rounds: FP32 40.9–42.6 ms, baseline 17.7–18.1 ms, optimized 4.18–4.24 ms). Snapdragon X2 Elite (X2E78100), plugged in, Windows power mode **Best performance**, QNN execution provider 2.2480.53.0, measured 2026-11-09. Absolute numbers vary between machines and sessions; compare the models within the table.
 
 ¹ Measured separately with `winml eval --mode compare` against the FP32 model on the CPU: mean cosine similarity of the model's output (every token) over 380 real text inputs; 1.0 = identical. A model is considered accurate at ≥ 0.99.
 
@@ -129,7 +129,7 @@ The compiled `.bin` is specific to the NPU it was built on (an X2 Elite build wo
 | `src/Engine/SearchEngine.cs` | Knowledge base, FP32 CPU reference, cosine ranking |
 | `src/FabrikamAgentAssist/` | WinUI 3 app (unpackaged, dark theme) |
 | `src/FabrikamAgentAssist/Assets/kb.json` | 90 help articles (Orders, Returns, Billing, Account, Tech support, Warranty), each with a short ready-to-send `reply`. Only the title + body are embedded for matching; the reply is what the app shows |
-| `src/FabrikamAgentAssist/Assets/traffic.json` | 75 labeled customer messages |
+| `src/FabrikamAgentAssist/Assets/traffic.json` | 50 labeled customer messages (8–9 per category) |
 | `src/FabrikamAgentAssist/Assets/vocab.txt` | Tokenizer vocabulary from bge-base-en-v1.5 |
 | `tools/make-icon.ps1` | Regenerates `Assets/AppIcon.ico` |
 | `optimization/` | `winml build` configs for the NPU baseline and optimized models, plus `prepare_model.py` |
